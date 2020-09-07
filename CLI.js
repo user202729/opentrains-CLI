@@ -142,6 +142,8 @@ async function submit(problemIndex, languageIndex, fileName, options){
 		path.basename(fileName))
 	form.append("action_40", "Send!") // perhaps unintentional?...
 	return await checkSession(async ()=>await axios.post(`${options.url}`, form.getBuffer(), {headers: form.getHeaders()}))
+	// Note: it appears that the server does not support HTTP chunked encoding.
+	// form.getBuffer() and readFileSync will do it (at least for this version)
 }
 
 async function submitCommand(problemIndex, languageIndex, fileName, options){
