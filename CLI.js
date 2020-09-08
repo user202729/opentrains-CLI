@@ -28,6 +28,8 @@ try{
 }
 if(!SidOf) SidOf={}
 
+function sleep(time){ return new Promise(
+	(resolve, _reject)=>setTimeout(resolve, time)) }
 function readline(query){ return new Promise(
 	//rl.resume()
 	(resolve, _reject)=>rl.question(query, function(answer){
@@ -67,6 +69,7 @@ function saveFile(){
 async function checkSession(f){
 	// f: () -> axios response object
 	// might call f twice if the session has expired
+	// also returns the axios response object
 
 	const result=await f()
 	const $=cheerio.load(result.data)
@@ -95,22 +98,47 @@ function parseSubmissions(data){ // data: HTML string
 	)
 }
 
-function printSubmissions(data){ // data: HTML string
-	const result=parseSubmissions(data)
-	console.table(result.reverse().map(
-		([RunId, Time, Size, Problem, Language, Result])=>({RunId, Time, Size, Problem, Language, Result})
+function printSubmissions(data){ // data: result of parseSubmissions
+	console.table(data.map(
+		([RunId, Time, Size, Problem, Language, Result, FailedTest])=>({RunId, Time, Size, Problem, Language, Result, FailedTest})
 	))
 }
 
+async function getAllSubmissions(options){ // download and parse submissions.
+	// options: (same as function login)
+	// return type: same as parseSubmissions
+	await login(options)
+	const result=await checkSession(async ()=>await axios.get(`${options.url}?SID=${SidOf[contestId]}&all_runs=1&action=140`))
+	return parseSubmissions(result.data)
+}
+
+function noneWaiting(data){
+	// data: parseSubmissions output format
+	// return: bool
+	return data.find(row=>row[5].includes("..."))===undefined
+}
+
+const watchDelay=2000
+async function watchSubmissions(options){ // returns when there's no pending submission left
+	// first print is immediate.
+	// options: (same as function login)
+	while(true){
+		const data=await getAllSubmissions(options)
+		printSubmissions(data)
+		if(noneWaiting(data))
+			break
+		await sleep(watchDelay)
+	}
+}
+
 async function listAllCommand(options){
-	await login(options.parent)
-	const result=await checkSession(async ()=>await axios.get(`${options.parent.url}?SID=${SidOf[contestId]}&all_runs=1&action=140`))
-	// run id, time, size, problem, language, result, failed test, view source, view report
-	printSubmissions(result.data)
+	await watchSubmissions(options.parent)
 }
 
 async function submit(problemIndex, languageIndex, fileName, options){
 	// options: (same as function login)
+	// returns page content (contains submissions info -- axios automatically follows redirect)
+
 	/* languageIndex (at the time of writing)
 	2	gcc - GNU C 6.4.0
 	3	g++ - GNU C++ 8.2 (c++17)
@@ -141,14 +169,17 @@ async function submit(problemIndex, languageIndex, fileName, options){
 		fs.readFileSync(fileName),
 		path.basename(fileName))
 	form.append("action_40", "Send!") // perhaps unintentional?...
-	return await checkSession(async ()=>await axios.post(`${options.url}`, form.getBuffer(), {headers: form.getHeaders()}))
+	const result=await checkSession(async ()=>await axios.post(`${options.url}`, form.getBuffer(), {headers: form.getHeaders()}))
 	// Note: it appears that the server does not support HTTP chunked encoding.
 	// form.getBuffer() and readFileSync will do it (at least for this version)
+	return result.data
 }
 
 async function submitCommand(problemIndex, languageIndex, fileName, options){
-	const result=await submit(problemIndex, languageIndex, fileName, options.parent)
-	printSubmissions(result.data)
+	const data=await submit(problemIndex, languageIndex, fileName, options.parent)
+	printSubmissions(parseSubmissions(data))
+	await sleep(watchDelay) // it's almost certain that the program is not yet compiled
+	await watchSubmissions(options.parent)
 }
 
 program.version("0.0.0")
