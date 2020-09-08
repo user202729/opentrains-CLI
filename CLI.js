@@ -98,7 +98,7 @@ function parseSubmissions(data){ // data: HTML string
 function printSubmissions(data){ // data: HTML string
 	const result=parseSubmissions(data)
 	console.table(result.reverse().map(
-		([RunId, Time, Size, Problem, Language])=>({RunId, Time, Size, Problem, Language})
+		([RunId, Time, Size, Problem, Language, Result])=>({RunId, Time, Size, Problem, Language, Result})
 	))
 }
 
@@ -147,7 +147,7 @@ async function submit(problemIndex, languageIndex, fileName, options){
 }
 
 async function submitCommand(problemIndex, languageIndex, fileName, options){
-	const result=submit(problemIndex, languageIndex, fileName, options.parent)
+	const result=await submit(problemIndex, languageIndex, fileName, options.parent)
 	printSubmissions(result.data)
 }
 
