@@ -2,8 +2,7 @@
 "use strict"
 
 const {program}=require("commander")
-const rl=require("readline").createInterface({input: process.stdin, output: process.stdout})
-rl.pause()
+const readline_=require("readline")
 const fs=require("fs")
 const qs=require("qs")
 const axios=require("axios")
@@ -31,12 +30,15 @@ if(!SidOf) SidOf={}
 function sleep(time){ return new Promise(
 	(resolve, _reject)=>setTimeout(resolve, time)) }
 function readline(query){ return new Promise(
-	//rl.resume()
-	(resolve, _reject)=>rl.question(query, function(answer){
-		rl.pause()
-		resolve(answer)
+	// might not work properly if multiple functions try to call this function at the same time.
+	function(resolve, _reject){
+		const rl=readline_.createInterface({input: process.stdin, output: process.stdout})
+		rl.question(query, function(answer){
+			rl.close()
+			resolve(answer)
+		})
 	})
-)}
+}
 
 async function login(options){
 	// options: {username, contestid, password, url}
