@@ -82,9 +82,11 @@ async function checkSession(f){
 	return await f()
 }
 
-function parseSubmissions(data){ // data: HTML string
-	// might throw an error
-	// see printSubmissions for return format
+function parseTable(data){ // data: HTML string
+	// checks for "Operation completed with errors" title
+	// use `table.b1` selector
+	// returns the text in each table cell
+
 	const $=cheerio.load(data)
 	if($("title").text()==="Operation completed with errors"){
 		fs.writeFileSync("/tmp/error_log.html", data)
@@ -95,15 +97,34 @@ function parseSubmissions(data){ // data: HTML string
 		fs.writeFileSync("/tmp/error_log.html", data)
 		throw Error("Invalid HTML")
 	}
-	return rows.slice(1).map(
-		row=>$(row).find("td").toArray().map(cell=>$(cell).text()).slice(0, -2)
+	return rows.map(
+		row=>$(row).find("td").toArray().map(cell=>$(cell).text())
 	)
+}
+
+function parseSubmissions(data){ // data: HTML string
+	// might throw an error
+	// see printSubmissions for return format
+	return parseTable(data).slice(1).map(row=>row.slice(0, -2))
 }
 
 function printSubmissions(data){ // data: result of parseSubmissions
 	console.table(data.map(
 		([RunId, Time, Size, Problem, Language, Result, FailedTest])=>({RunId, Time, Size, Problem, Language, Result, FailedTest})
 	))
+}
+
+async function getProblems(options){
+	// options: (same as function login)
+	// return type: list of [short name, long name, several other stuff]
+	await login(options)
+	const result=await checkSession(async ()=>await axios.get(`${options.url}?SID=${SidOf[contestId]}&action=137`))
+	return parseTable(result.data).slice(1)
+}
+
+async function problemsCommand(options){
+	const result=await getProblems(options.parent)
+	console.table(result)
 }
 
 async function getAllSubmissions(options){ // download and parse submissions.
@@ -184,7 +205,7 @@ async function submitCommand(problemIndex, languageIndex, fileName, options){
 	await watchSubmissions(options.parent)
 }
 
-program.version("0.0.0")
+program.version("0.1.0")
 .option("-U, --url <url>", "url",
 	"http://opentrains.mipt.ru/~ejudge/team.cgi"
 	//"http://localhost/"
@@ -193,6 +214,10 @@ program.version("0.0.0")
 .option("-u, --username <username>", "username (login)", username)
 .option("-p, --password <password>", "password (specify empty password for a prompt. "+
 	"If not specified, the last password will be used)", password)
+
+program.command("problems")
+.description("list all problems")
+.action(problemsCommand)
 
 program.command("list_all")
 .alias("ls")
