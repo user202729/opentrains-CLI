@@ -198,14 +198,38 @@ async function submit(problemIndex, languageIndex, fileName, options){
 	return result.data
 }
 
-async function submitCommand(problemIndex, languageIndex, fileName, options){
+async function submitCommand(languageIndex, fileName, problemIndex, options){
+	if((problemIndex!==undefined)+(options.shortname!==undefined)+(options.longname!==undefined)!==1)
+		throw Error("Exactly one of problemIndex, shortname, or longname must be specified")
+
+	if(options.longname!==undefined){
+		const problemName=options.longname.trim()
+		problemIndex=(await getProblems(options.parent)).findIndex(function(row){return row[1].trim()===problemName})
+		if(problemIndex===-1)
+			throw Error(`Cannot find long problem name: ${problemName}`)
+		problemIndex+=1
+	}
+	else if(options.shortname!==undefined){
+		const problemName=options.shortname.trim()
+		problemIndex=(await getProblems(options.parent)).findIndex(function(row){return row[0].trim()===problemName})
+		if(problemIndex===-1)
+			throw Error(`Cannot find short problem name: ${problemName}`)
+		problemIndex+=1
+	}
+	else{
+		const problemIndex1=parseInt(problemIndex)
+		if(isNaN(problemIndex1))
+			throw Error(`Invalid problem index: ${problemIndex}`)
+		problemIndex=problemIndex1
+	}
+
 	const data=await submit(problemIndex, languageIndex, fileName, options.parent)
 	printSubmissions(parseSubmissions(data))
 	await sleep(watchDelay) // it's almost certain that the program is not yet compiled
 	await watchSubmissions(options.parent)
 }
 
-program.version("0.1.0")
+program.version("0.2.0")
 .option("-U, --url <url>", "url",
 	"http://opentrains.mipt.ru/~ejudge/team.cgi"
 	//"http://localhost/"
@@ -226,9 +250,11 @@ program.command("list_all")
 .description("list all submissions")
 .action(listAllCommand)
 
-program.command("submit <problemindex> <languageindex> <filename>")
+program.command("submit <languageindex> <filename> [problemindex]")
 .alias("sub")
 .description("submit")
+.option("-s, --shortname <name>", "problem short name")
+.option("-l, --longname <name>", "problem long name")
 .action(submitCommand)
 
 program.parse(process.argv)
