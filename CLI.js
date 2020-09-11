@@ -180,7 +180,7 @@ async function submit(problemIndex, languageIndex, fileName, options){
 		throw Error("Invalid languageIndex: "+languageIndex)
 
 
-	if(problemIndex!==parseInt(problemIndex).toString())
+	if(isNaN(parseInt(problemIndex)))
 		throw Error("Invalid problemIndex: "+problemIndex)
 
 	const form=new FormData() // multipart/form-data
